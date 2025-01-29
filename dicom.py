@@ -25,11 +25,21 @@ def change_folder_name(accessiondict, path):
         for name in dirs:
             folder_path = os.path.join(root, name)
             final_path = os.path.join(folder_path, first_sub_folders)
-            ds = pm.dcmread(final_path)
-            an = ds.AccessionNumber
-            id = str(accessiondict[an])
-            new_folder_path = os.path.join(root, id)
-            os.rename(folder_path, new_folder_path)
+            try:
+                ds = pm.dcmread(final_path)
+                an = ds.AccessionNumber
+                if an in accessiondict:
+                    id = str(accessiondict[an])
+                    new_folder_path = os.path.join(root, id)
+                    os.rename(folder_path, new_folder_path)
+                else:
+                    # Show error message if AccessionNumber not found in dictionary
+                    messagebox.showerror("Accession Number Not Found", f"Accession Number {an} not found in the provided dictionary. Skipping folder: {folder_path}")
+                    continue  # Skip to next iteration of the loop
+            except Exception as e:
+                # Handle any errors with reading the DICOM file
+                messagebox.showerror("Error", f"Error processing {folder_path}: {e}")
+
 
             
 
@@ -70,7 +80,7 @@ def process_directory(directory, file, number1, number2, progress_callback):
 class App:
     def __init__(self, root):
         self.root = root
-        self.root.title("Anonimitzador de DICOM")
+        self.root.title("Anonimitzador de DICOM by X. Michelena")
 
         self.directory = None
         self.info_file = None
@@ -80,25 +90,25 @@ class App:
         self.create_widgets()
 
     def create_widgets(self):
-        # Step 1: Directory selection
+    
         self.select_dir_label = tk.Label(self.root, text="Selecciona la carpeta amb tots els pacients (si utilitzes Starviewer és la carpeta DICOM)")
         self.select_dir_label.pack(pady=5)
 
         self.select_dir_button = tk.Button(self.root, text="Selecciona carpeta", command=self.select_directory)
         self.select_dir_button.pack(pady=5)
 
-        self.dir_display = tk.Label(self.root, text="No directory selected", fg="gray")
+        self.dir_display = tk.Label(self.root, text="Cap directori seleccionat", fg="gray")
         self.dir_display.pack(pady=5)
 
         self.select_file_label = tk.Label(self.root, text="Selecciona l'excel amb la relació id-accession number. Utilitza format arxiu de prova")
         self.select_file_label.pack(pady=5)
         self.select_file_label.pack_forget()
 
-        self.select_file_button = tk.Button(self.root, text="Select File", command=self.select_file)
+        self.select_file_button = tk.Button(self.root, text="Selecciona excel", command=self.select_file)
         self.select_file_button.pack(pady=5)
         self.select_file_button.pack_forget()
 
-        self.file_display = tk.Label(self.root, text="No file selected", fg="gray")
+        self.file_display = tk.Label(self.root, text="Cap excel seleccionat", fg="gray")
         self.file_display.pack(pady=5)
         self.file_display.pack_forget()
 
@@ -111,7 +121,7 @@ class App:
         self.num1_entry.pack(pady=5)
         self.num1_entry.pack_forget()
 
-        self.num1_button = tk.Button(self.root, text="Next", command=self.enter_number1)
+        self.num1_button = tk.Button(self.root, text="Següent", command=self.enter_number1)
         self.num1_button.pack(pady=5)
         self.num1_button.pack_forget()
 
@@ -129,16 +139,16 @@ class App:
         self.num2_button.pack_forget()
 
         # Progress Bar
-        self.progress_label = tk.Label(self.root, text="Progress:")
+        self.progress_label = tk.Label(self.root, text="Progrés:")
         self.progress_label.pack(pady=5)
         self.progress_label.pack_forget()
 
-        self.progress_bar = ttk.Progressbar(self.root, orient="horizontal", length=300, mode="determinate")
+        self.progress_bar = ttk.Progressbar(self.root, orient="horizontal", length=200, mode="determinate")
         self.progress_bar.pack(pady=5)
         self.progress_bar.pack_forget()
 
         # Current ID being processed
-        self.current_id_label = tk.Label(self.root, text="Currently processing ID: None")
+        self.current_id_label = tk.Label(self.root, text="Reconfigurant les carpetes...")
         self.current_id_label.pack(pady=5)
         self.current_id_label.pack_forget()
 
@@ -146,7 +156,7 @@ class App:
     def select_directory(self):
         self.directory = filedialog.askdirectory()
         if self.directory:
-            self.dir_display.config(text=f"Selected Directory: {self.directory}", fg="black")
+            self.dir_display.config(text=f"Directori seleccionat: {self.directory}", fg="black")
 
             # Show step 1.5
             self.select_file_label.pack()
@@ -156,7 +166,7 @@ class App:
     def select_file(self):
         self.info_file = filedialog.askopenfilename()
         if self.info_file:
-            self.file_display.config(text=f"Selected File: {self.info_file}", fg="black")
+            self.file_display.config(text=f"Excel seleccionat: {self.info_file}", fg="black")
 
             # Show step 2
             self.num1_label.pack()
@@ -175,7 +185,7 @@ class App:
             self.num2_entry.pack()
             self.num2_button.pack()
         except ValueError:
-            self.num1_label.config(text="Please enter a valid number", fg="red")
+            self.num1_label.config(text="No és un nombre vàlid", fg="red")
 
     def start_process(self):
         try:
@@ -190,30 +200,30 @@ class App:
             self.progress_bar['value'] = 0
 
             self.current_id_label.pack()
-            self.current_id_label.config(text="Currently processing ID: None")
+            self.current_id_label.config(text="Processant les carpetes...")
 
             # Start the processing in a separate thread
             thread = threading.Thread(target=self.run_process)
             thread.start()
         except ValueError:
-            self.num2_label.config(text="Please enter a valid number", fg="red")
+            self.num2_label.config(text="Si us plau, posa un nombre vàlid", fg="red")
 
     def run_process(self):
         def update_progress(progress, current_id):
             self.progress_bar['value'] = progress
-            self.current_id_label.config(text=f"Currently processing ID: {current_id}")
+            self.current_id_label.config(text=f"Processant imatges del ID: {current_id}")
             self.root.update_idletasks()
 
         try:
             process_directory(self.directory, self.info_file, self.number1, self.number2, update_progress)
 
             # When done
-            self.progress_label.config(text="Process Complete!", fg="green")
-            self.current_id_label.config(text="All processing complete.")
+            self.progress_label.config(text="Procés complet!", fg="green")
+            self.current_id_label.config(text="Procés complet!")
         except Exception as e:
             # Catch and show the error in a messagebox
             messagebox.showerror("Error", f"An error occurred: {e}")
-            self.progress_label.config(text="Process failed.", fg="red")
+            self.progress_label.config(text="El procés ha fallat. Torna a començar", fg="red")
 
 
         # When done
