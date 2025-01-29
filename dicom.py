@@ -39,6 +39,7 @@ def change_folder_name(accessiondict, path):
             except Exception as e:
                 # Handle any errors with reading the DICOM file
                 messagebox.showerror("Error", f"Error processing {folder_path}: {e}")
+                break
 
 
             
